@@ -1,0 +1,36 @@
+{
+  "name": "귀여운 체스 — AI 대전",
+  "short_name": "귀여운 체스",
+  "description": "폰에서 바로 두는 귀여운 체스. 별명을 넣고 AI 난이도 5단계와 대국하세요.",
+  "lang": "ko",
+  "dir": "ltr",
+  "start_url": "./index.html?source=pwa",
+  "scope": "./",
+  "id": "cute-chess",
+  "display": "standalone",
+  "display_override": ["standalone", "minimal-ui"],
+  "orientation": "portrait",
+  "background_color": "#fff6fb",
+  "theme_color": "#fff6fb",
+  "categories": ["games", "entertainment"],
+  "icons": [
+    {
+      "src": "icons/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "icons/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "icons/icon-maskable-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
+    }
+  ]
+}

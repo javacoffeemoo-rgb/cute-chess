@@ -1,0 +1,69 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<title>perft 검증 (개발용)</title>
+<style>
+  body { font: 14px/1.6 Consolas, monospace; padding: 16px; background:#111; color:#eee; }
+  .ok { color:#4ade80 } .fail { color:#f87171; font-weight:700 }
+  h1 { font-size:18px }
+</style>
+</head>
+<body>
+<h1>perft 검증</h1>
+<p>자체 규칙 엔진(engine/rules.js)이 캐슬링 · 앙파상 · 프로모션 · 핀을 정확히 처리하는지 노드 수로 확인한다.</p>
+<pre id="out">계산 중…</pre>
+<script src="../engine/rules.js"></script>
+<script>
+  // 표준 perft 검증 국면 (정답은 공개된 기준값)
+  const CASES = [
+    { name: '1. 시작 국면', fen: null, want: [20, 400, 8902, 197281, 4865609] },
+    { name: '2. Kiwipete (캐슬링·핀 복합)', fen: 'r3k2r/p1ppqpb1/bn2pnp1/3PN3/1p2P3/2N2Q1p/PPPBBPPP/R3K2R w KQkq - 0 1', want: [48, 2039, 97862, 4085603] },
+    { name: '3. 앙파상 특화', fen: '8/2p5/3p4/KP5r/1R3p1k/8/4P1P1/8 w - - 0 1', want: [14, 191, 2812, 43238] },
+    { name: '4. 프로모션 특화', fen: 'r3k2r/Pppp1ppp/1b3nbN/nP6/BBP1P3/q4N2/Pp1P2PP/R2Q1RK1 w kq - 0 1', want: [6, 264, 9467, 422333] },
+    { name: '5. 프로모션·핀', fen: 'rnbq1k1r/pp1Pbppp/2p5/8/2B5/8/PPP1NnPP/RNBQK2R w KQ - 1 8', want: [44, 1486, 62379] },
+    { name: '6. 중반전', fen: 'r4rk1/1pp1qppp/p1np1n2/2b1p1B1/2B1P1b1/P1NP1N2/1PP1QPPP/R4RK1 w - - 0 10', want: [46, 2079, 89890] },
+  ];
+
+  const out = document.getElementById('out');
+  const lines = [];
+  let fails = 0, done = 0;
+
+  // (국면, 깊이) 작업 목록을 만든다
+  const jobs = [];
+  CASES.forEach((c, ci) => c.want.forEach((w, di) => jobs.push({ c, ci, depth: di + 1, want: w })));
+
+  window.__perft = { done: false, fails: 0, total: jobs.length, completed: 0 };
+
+  function render() {
+    out.textContent = lines.join('\n');
+  }
+
+  // 한 번에 하나씩 실행해서 화면이 갱신되도록 한다
+  function step(i) {
+    if (i >= jobs.length) {
+      lines.push('');
+      lines.push(fails === 0 ? '=== 전체 통과 (' + jobs.length + '개) ===' : '=== 실패 ' + fails + '개 / ' + jobs.length + '개 ===');
+      render();
+      window.__perft.done = true;
+      window.__perft.fails = fails;
+      return;
+    }
+    const j = jobs[i];
+    const game = new Rules();
+    if (j.c.fen) game.load(j.c.fen);
+    const t0 = performance.now();
+    const got = game.perft(j.depth);
+    const ms = Math.round(performance.now() - t0);
+    const ok = got === j.want;
+    if (!ok) fails++;
+    lines.push((ok ? 'OK   ' : 'FAIL ') + j.c.name + ' depth ' + j.depth + ': ' + got + ' (기준 ' + j.want + ') ' + ms + 'ms');
+    window.__perft.completed = i + 1;
+    render();
+    setTimeout(() => step(i + 1), 0);
+  }
+
+  step(0);
+</script>
+</body>
+</html>

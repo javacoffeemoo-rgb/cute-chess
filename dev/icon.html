@@ -1,0 +1,61 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<title>아이콘 소스</title>
+<style>
+  html, body { margin: 0; height: 100%; }
+  body { display: grid; place-items: center; background: #fff6fb; overflow: hidden; }
+
+  /* 앱 아이콘 배경 : 파스텔 그라데이션 + 은은한 하이라이트 */
+  #icon {
+    position: relative;
+    display: grid;
+    place-items: center;
+    background:
+      radial-gradient(90% 80% at 28% 18%, #fff2f8 0%, transparent 60%),
+      linear-gradient(150deg, #ffe3ef 0%, #ffc9e2 55%, #e3f1ff 100%);
+    border-radius: 23%;
+    overflow: hidden;
+  }
+  /* maskable 아이콘 : 안드로이드가 동그랗게 잘라내므로 꽉 채우고 안쪽에 그린다 */
+  #icon.mask { border-radius: 0; }
+  #icon::after {                       /* 바닥 그림자 */
+    content: "";
+    position: absolute;
+    bottom: 6%;
+    width: 46%;
+    height: 5%;
+    border-radius: 50%;
+    background: rgba(150, 60, 110, .16);
+    filter: blur(6px);
+  }
+  #icon .piece { width: 68%; height: 68%; filter: drop-shadow(0 10px 12px rgba(150, 60, 110, .28)); }
+  #icon.mask .piece { width: 50%; height: 50%; }
+
+  /* 기물 색 (style.css 와 동일 규칙 — 이 페이지는 독립 실행된다) */
+  .piece.w { --body: #fffaf2; --line: #7a6448; --eye: #4a3a2a; --shine: #ffffff; --blush: #f6a8bb; --mane: #c9b498; --gem: #ff9dc0; }
+  .piece .f { fill: var(--body); stroke: var(--line); stroke-width: 4; stroke-linejoin: round; stroke-linecap: round; }
+  .piece .d { fill: var(--eye); }
+  .piece .s { fill: var(--shine); }
+  .piece .bl { fill: var(--blush); opacity: .85; }
+  .piece .st { fill: none; stroke: var(--eye); stroke-width: 2.4; stroke-linecap: round; }
+  .piece .mn { fill: none; stroke: var(--mane); stroke-width: 3.2; stroke-linecap: round; }
+  .piece .gm { fill: var(--gem); stroke: var(--line); stroke-width: 2; }
+</style>
+</head>
+<body>
+  <div id="icon"></div>
+  <script src="../pieces.js"></script>
+  <script>
+    // ?size=512&mask=1&p=k  → 크기 / maskable 여부 / 기물 종류
+    const q = new URLSearchParams(location.search);
+    const size = Number(q.get('size') || 512);
+    const el = document.getElementById('icon');
+    el.style.width = size + 'px';
+    el.style.height = size + 'px';
+    if (q.get('mask') === '1') el.classList.add('mask');
+    el.innerHTML = window.CutePieces.pieceHTML(q.get('p') || 'k', 'w');
+  </script>
+</body>
+</html>

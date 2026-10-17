@@ -1,0 +1,113 @@
+<!DOCTYPE html>
+<html lang="ko" data-theme="pastel">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>기물 확인 시트 (개발용)</title>
+<link rel="stylesheet" href="../style.css">
+<style>
+  body { padding: 20px; }
+  h2 { font-size: 14px; color: var(--muted); margin: 18px 0 8px; }
+  .row { display: flex; gap: 10px; flex-wrap: wrap; }
+  .cell { text-align: center; }
+  .cell svg { width: 120px; height: 120px; }
+  .cell .lb { font-size: 11px; font-weight: 700; color: var(--muted); }
+  .on-light { background: var(--sq-light); border-radius: 12px; }
+  .on-dark { background: var(--sq-dark); border-radius: 12px; }
+  .mini svg { width: 46px; height: 46px; }   /* 실제 폰 크기(약 44px) 확인용 */
+</style>
+</head>
+<body>
+<h2>백 (light 칸 / dark 칸)</h2>
+<div class="row" id="w"></div>
+<h2>흑 (light 칸 / dark 칸)</h2>
+<div class="row" id="b"></div>
+<h2>실제 폰 크기 (약 44px) — 이 크기에서도 구분되는지 확인</h2>
+<div class="row mini" id="mini"></div>
+
+<script src="../pieces.js"></script>
+<script>
+  const { pieceHTML } = window.CutePieces;
+  const ORDER = ['k','q','r','b','n','p'];
+  const NAME = { p:'폰', n:'나이트', b:'비숍', r:'루크', q:'퀸', k:'킹' };
+
+  document.getElementById('w').innerHTML = ORDER.map(t =>
+    `<div class="cell on-light">${pieceHTML(t,'w')}<div class="lb">${NAME[t]}</div></div>` +
+    `<div class="cell on-dark">${pieceHTML(t,'w')}</div>`).join('');
+  document.getElementById('b').innerHTML = ORDER.map(t =>
+    `<div class="cell on-light">${pieceHTML(t,'b')}<div class="lb">${NAME[t]}</div></div>` +
+    `<div class="cell on-dark">${pieceHTML(t,'b')}</div>`).join('');
+  document.getElementById('mini').innerHTML = ORDER.map(t =>
+    pieceHTML(t,'w') + pieceHTML(t,'b') +
+    `<div class="cell on-dark">${pieceHTML(t,'w')}${pieceHTML(t,'b')}</div>`).join('');
+
+  /* ------------------------------------------------------------
+     검수용 : 지금 화면의 기물을 스타일까지 굳혀서 SVG 한 장으로 내보낸다.
+     → PyQt5(QtSvg) 는 CSS 변수를 못 읽으므로 계산된 스타일을 속성으로 박아넣는다.
+     사용: window.__dumpSheet()  (버튼 클릭과 동일)
+     ------------------------------------------------------------ */
+  const LIGHT = '#fff3e0', DARK = '#e9c9a4';
+
+  function flat(el) {
+    const clone = el.cloneNode(true);
+    const s = el.querySelectorAll('*'), d = clone.querySelectorAll('*');
+    for (let i = 0; i < s.length; i++) {
+      const cs = getComputedStyle(s[i]), t = d[i];
+      t.removeAttribute('class');
+      t.setAttribute('fill', cs.fill);
+      if (cs.stroke && cs.stroke !== 'none') {
+        t.setAttribute('stroke', cs.stroke);
+        t.setAttribute('stroke-width', cs.strokeWidth);
+        t.setAttribute('stroke-linecap', 'round');
+        t.setAttribute('stroke-linejoin', 'round');
+      } else { t.setAttribute('stroke', 'none'); }
+      const op = parseFloat(cs.opacity);
+      if (op < 1) t.setAttribute('opacity', String(op));
+    }
+    clone.removeAttribute('class');
+    clone.removeAttribute('style');
+    return clone.innerHTML;
+  }
+
+  window.__dumpSheet = function () {
+    const sets = [
+      { bg: LIGHT, data: ['#w .cell.on-light svg'], flip: false },
+      { bg: DARK,  data: ['#w .cell.on-dark svg'],  flip: false },
+      { bg: LIGHT, data: ['#b .cell.on-light svg'], flip: false },
+      { bg: DARK,  data: ['#b .cell.on-dark svg'],  flip: false },
+    ].map(s => ({ bg: s.bg, data: [...document.querySelectorAll(s.data[0])].map(flat) }));
+
+    const cellW = 132, pad = 14, W = 900;
+    const H = sets.length * cellW + 90;
+    let out = `<svg xmlns="http://www.w3.org/2000/svg" width="${W}" height="${H}" viewBox="0 0 ${W} ${H}">`;
+    out += `<rect width="100%" height="100%" fill="#ffffff"/>`;
+    sets.forEach((set, ri) => {
+      const y = pad + ri * cellW;
+      set.data.forEach((inner, ci) => {
+        const x = pad + ci * cellW;
+        out += `<rect x="${x}" y="${y}" width="${cellW - 4}" height="${cellW - 4}" rx="10" fill="${set.bg}"/>`;
+        out += `<svg x="${x}" y="${y}" width="${cellW - 4}" height="${cellW - 4}" viewBox="0 0 100 100">${inner}</svg>`;
+      });
+    });
+    // 실제 폰 크기(약 48px) 확인 줄
+    const sy = pad + sets.length * cellW + 16;
+    ['w', 'b'].forEach((col, ci) => {
+      const src = sets[ci === 0 ? 0 : 2].data;
+      for (let k = 0; k < 6; k++) {
+        const x = pad + (ci * 6 + k) * 52;
+        out += `<rect x="${x}" y="${sy}" width="48" height="48" rx="6" fill="${((ci * 6 + k) % 2) ? DARK : LIGHT}"/>`;
+        out += `<svg x="${x}" y="${sy}" width="48" height="48" viewBox="0 0 100 100">${src[k]}</svg>`;
+      }
+    });
+    out += '</svg>';
+
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(new Blob([out], { type: 'image/svg+xml' }));
+    a.download = 'piece-sheet.svg';
+    document.body.appendChild(a);
+    a.click();
+    return out.length;
+  };
+</script>
+</body>
+</html>

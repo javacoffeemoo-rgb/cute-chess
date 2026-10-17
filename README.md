@@ -16,7 +16,15 @@
 | 3주차 | AI 대전 (Web Worker · 난이도 5단계) · 진영 선택 · 승/패 결과 · 쌍 되돌리기 · 검색 최적화 | ✅ 완료 |
 | 4주차 | 대국 자동 저장/이어하기 · 효과음(WebAudio) · PWA(오프라인 · 홈 화면 추가) + 종합 테스트 122개 | ✅ 완료 |
 | **5주차** | **AI 응수 다양성 — 같은 국면에서 매번 같은 수만 두지 않게 (오프닝 북 + 후보 무작위 선택)** | ✅ **완료** |
+| 배포 | **GitHub Pages 배포 (HTTPS)** — 폰에서 홈 화면에 추가해 앱처럼 실행 가능 | ✅ **완료** |
 | 다음 | 실기기(안드로이드) 테스트 · 기보 보관함(PGN) · AI 코멘트 · Stockfish 옵션 | ⬜ 예정 |
+
+### 🔗 지금 바로 열어볼 수 있습니다
+
+**<https://javacoffeemoo-rgb.github.io/cute-chess/>**
+
+폰에서 이 주소를 열고 → 브라우저 메뉴 → **홈 화면에 추가** → 인터넷이 없어도 앱처럼 실행됩니다.
+(올린 직후 `dev/verify_deploy.py` 로 **실제 주소를 15개 항목 검사 → 전부 통과**)
 
 <img src="dev/shot4-1-resume-card.png" width="180"> <img src="dev/shot4-5-offline-home.png" width="180"> <img src="dev/shot4-6-offline-game.png" width="180">
 
@@ -443,7 +451,7 @@ python dev/verify_deploy.py    # 하위 경로 배포에서도 도는지 16개 �
 1. <https://app.netlify.com/drop> → `dist` 폴더를 드래그
 2. 바로 주소가 나옵니다 (계속 쓰려면 무료 가입)
 
-### 방법 3 — GitHub Pages (이 PC 에 git 이 있어서 명령으로 가능)
+### 방법 3 — GitHub Pages (이 저장소가 이미 이 방식으로 올라가 있습니다)
 
 ```powershell
 cd chess-game
@@ -455,19 +463,31 @@ git push -u origin main          # 첫 push 때 브라우저 로그인 창이 �
 → GitHub 저장소 → **Settings → Pages → Branch: `main` / `(root)` → Save**
 → 1~2분 뒤 **`https://<사용자>.github.io/<저장소>/`**
 
-### 올린 뒤 확인
+저장소 루트가 곧 앱이라 `dist/` 는 필요 없습니다(`.gitignore` 에 들어 있음 — 다른 호스팅에 드래그&드롭할 때만 씁니다).
+`.nojekyll` 이 있어서 Pages 가 파일을 그대로 서빙합니다.
+`gh`(GitHub CLI)가 있으면 명령 한 줄로 끝납니다:
+```powershell
+gh repo create <저장소> --public --source=. --remote=origin --push
+gh api -X POST repos/<사용자>/<저장소>/pages -f "source[branch]=main" -f "source[path]=/"
+```
+
+### 올린 뒤 확인 — 이 저장소로 실제 통과한 결과
 
 ```powershell
-python dev/verify_deploy.py https://실제주소/
+python dev/verify_deploy.py https://<주소>/
 ```
-정적 파일 · 매니페스트·아이콘 · 서비스 워커(등록·범위·캐시) · Worker AI · **오프라인 새로고침** 까지 검사합니다.
+정적 파일 · 매니페스트·아이콘 · 서비스 워커(등록·범위·캐시 12개) · Worker AI · **오프라인 새로고침** · 콘솔 오류 0 → **15개 전부 통과** (2026-10-17)
+GitHub Pages 는 `.js` 를 `application/javascript` 로 보내서 **Web Worker 도 정상**입니다.
 
 ⚠️ 알아둘 것
 - **HTTPS 여야** 서비스 워커·홈 화면 추가가 됩니다 (위 세 가지 모두 HTTPS ✓).
   같은 Wi-Fi 의 `http://172.30.1.63:8123` 주소는 보안 컨텍스트가 아니라 설치·오프라인이 막힙니다(게임 자체는 됩니다).
-- 파일을 고쳐서 다시 올릴 때는 `sw.js` 의 `VERSION` 을 올리세요 —
-  그래야 폰이 캐시 대신 새 파일을 받습니다(올리지 않으면 이전 화면이 남을 수 있음).
-- `dist/` 는 언제든 `python dev/make_dist.py` 로 다시 만들면 되므로, 저장소에는 넣지 않아도 됩니다.
+- 파일을 고쳐서 **다시 올릴 때** — `sw.js` 의 `VERSION` 을 올리고(`cute-chess-v1.3` 처럼) 아래 세 줄이면 됩니다.
+  GitHub Pages 는 push 를 감지해 20초쯤 뒤 자동으로 다시 배포합니다.
+  ```powershell
+  git add . ; git commit -m "고친 내용" ; git push
+  ```
+- `dist/` 는 언제든 `python dev/make_dist.py` 로 다시 만들면 되므로, 저장소에는 넣지 않았습니다.
 
 ---
 

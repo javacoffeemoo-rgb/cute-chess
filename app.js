@@ -84,6 +84,7 @@
     aiInfo: null,            // 마지막 AI 탐색 정보 {depth, nodes, ms}
     taken: { w: [], b: [] }, // 잡힌 기물 목록 (6주차 : 얼굴 반응에 쓴다)
     animHide: [],            // 이동 연출 중 숨길 칸 (도착 칸 · 캐슬링 룩 칸)
+    fxUntil: 0,              // 지금 연출이 끝나는 시각 (AI 가 이보다 먼저 두지 않게)
     clock: 0,
     timerId: null,
   };
@@ -371,8 +372,8 @@
        · 규칙(상태)은 applyMove 에서 이미 바뀐다 → 연출은 "화면 위에서만" 한다
          (그래서 저장·테스트·되돌리기는 예전처럼 즉시 동기로 돈다)
        · 이동 : 기물이 천천히 미끄러진다 (나이트는 살짝 포물선)
-       · 도착 : 위치 확인 도장(체크) + 링 + 말랑 착지
-       · 잡힘 : 잡힌 기물의 얼굴이 바뀐다
+       · 도착 : 위치 확인 도장(체크) + 링 + 말랑 착지 (잡기에서는 생략)
+       · 잡힘 : 잡힌 기물이 그 자리에서 커지며 표정을 보여주고 → 다시 정상 크기로 돌아온 뒤 사라진다
             AI 기물이 잡히면 → 웃음(ㅋㅋ)   /   내 기물이 잡히면 → 울음(엉엉)
        · prefers-reduced-motion 이면 움직임 없이 바로 반영한다
      ========================================================== */
@@ -437,22 +438,24 @@
     function clear() {
       gen++;
       layer.innerHTML = '';
+      state.fxUntil = 0;
       reveal();
       boardEl.querySelectorAll('.land-ring, .land-stamp').forEach(el => el.remove());
       boardEl.querySelectorAll('.piece.land').forEach(el => el.classList.remove('land'));
     }
 
-    // 도착 연출 : 링 + 확인 도장 + 말랑 착지
-    function land(i) {
+    // 도착 연출 : 링 + (잡기가 아닐 때) 확인 도장 + 말랑 착지
+    function land(i, withStamp) {
       const cell = boardEl.querySelector(`.square[data-i="${i}"]`);
       if (!cell) return;
       const ring = document.createElement('span');
       ring.className = 'land-ring';
+      cell.appendChild(ring);
+
       const stamp = document.createElement('span');
       stamp.className = 'land-stamp';
       stamp.innerHTML = STAMP;
-      cell.appendChild(ring);
-      cell.appendChild(stamp);
+      if (withStamp) cell.appendChild(stamp);
 
       const p = cell.querySelector('.piece');
       if (p) {
@@ -467,11 +470,12 @@
       }, 1150);
     }
 
-    // 잡힌 기물 : 얼굴 바꿔서 둥실 떠오르며 사라진다
+    // 잡힌 기물 : 그 자리에서 커지며 표정(웃음/울음)을 보여주고 → 다시 정상 크기로 돌아온 뒤 사라진다
+    const VICTIM_MS = 1400;
     function victimFx(piece, sq) {
       const mood = (piece.color === aiColor()) ? 'laugh' : 'cry';
       const el = make('victim', sq, pieceHTML(piece.type, piece.color, mood));
-      setTimeout(() => el.remove(), 980);
+      setTimeout(() => el.remove(), VICTIM_MS + 80);
     }
 
     /**
@@ -487,7 +491,7 @@
 
       const my = gen;
       const isKnight = piece.type === 'n';
-      const dur = isKnight ? 430 : 330;         // 천천히 (기본 0.33초)
+      const dur = isKnight ? 760 : 600;         // 천천히 (기본 0.6초 · 나이트 0.76초)
 
       // 도착 칸(과 캐슬링 룩 칸)의 기물은 날아가는 동안 숨긴다 — 두 개가 겹쳐 보이지 않게
       const hides = [to];
@@ -523,12 +527,15 @@
         : (info.captured ? to : -1);
       const victim = capSq >= 0 ? before[capSq] : null;
 
+      // 이 연출이 끝나는 시각 — AI 가 이보다 먼저 두면 내 연출이 잘린다
+      state.fxUntil = nowMs() + dur + (victim ? VICTIM_MS : 0);
+
       setTimeout(() => {
         if (my !== gen) return;
         fly.remove();
         if (flyRook) flyRook.remove();
         reveal();
-        land(to);
+        land(to, !victim);                   // 잡기에서는 큰 표정이 "도착 확인" 역할을 한다
         if (victim) victimFx(victim, capSq);
       }, dur + 10);
     }
@@ -753,7 +760,7 @@
   }
 
   // AI 차례면 생각을 시작한다
-  const AI_MIN_MS = 520;      // 최소 대기 — 내 기물이 "도착하는 걸 보고" 응수하게 (연출 0.33초 + 여유)
+  const AI_MIN_MS = 900;      // 최소 대기 — 내 기물이 "도착하는 걸 보고" 응수하게 (사람처럼 한 박자)
   const nowMs = () => (window.performance && performance.now) ? performance.now() : Date.now();
 
   function maybeAI() {
@@ -782,7 +789,9 @@
         }
         state.thinking = false;
         applyMove(mv.from, mv.to, mv.promotion);
-      }, Math.max(0, AI_MIN_MS - (nowMs() - t0)));
+      }, Math.max(0,
+        AI_MIN_MS - (nowMs() - t0),            // 최소 0.9초
+        (state.fxUntil || 0) - nowMs()));      // + 내 이동·표정 연출이 끝날 때까지
     });
   }
 

@@ -59,12 +59,12 @@ PLAY = """
 }
 """
 
-# 비행 중 화면 : 연출 종료 타이머(340/440ms)를 잠깐 막아야 멈춘 화면이 사라지지 않는다
+# 비행 중 화면 : 연출 종료 타이머(610/770ms)를 잠깐 막아야 멈춘 화면이 사라지지 않는다
 PLAY_HOLD = """
 ([f, t]) => {
   const C = window.__cuteChess;
   const orig = window.setTimeout;
-  window.setTimeout = (fn, d) => (d === 340 || d === 440) ? 0 : orig(fn, d);
+  window.setTimeout = (fn, d) => (d === 610 || d === 770) ? 0 : orig(fn, d);
   C.state.thinking = true;
   C.play(f, t);
   C.state.thinking = false;
@@ -107,7 +107,7 @@ def main():
         # ---- 1) 천천히 이동 (미끄러지는 중) ----------------------------------
         print("1) 이동 중")
         page.evaluate(PLAY_HOLD, [52, 36])          # e2 → e4
-        page.evaluate(FREEZE, 150)
+        page.evaluate(FREEZE, 300)
         shot(page, "fx-1-fly.png")
         page.evaluate(THAW)
 
@@ -116,8 +116,8 @@ def main():
         page.evaluate(SET, "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1")
         page.wait_for_timeout(120)
         page.evaluate(PLAY, [52, 36])
-        page.wait_for_timeout(430)                  # 비행(330) 끝 + 도장 생성
-        page.evaluate(FREEZE, 250)
+        page.wait_for_timeout(900)                  # 비행(600) 끝 + 도장 생성
+        page.evaluate(FREEZE, 260)
         shot(page, "fx-2-land.png")
         page.evaluate(THAW)
 
@@ -126,7 +126,7 @@ def main():
         page.evaluate(SET, "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1")
         page.wait_for_timeout(120)
         page.evaluate(PLAY_HOLD, [57, 42])          # b1 → c3
-        page.evaluate(FREEZE, 200)
+        page.evaluate(FREEZE, 380)
         shot(page, "fx-3-knight.png")
         page.evaluate(THAW)
 
@@ -135,7 +135,7 @@ def main():
         page.evaluate(SET, "rnbqkbnr/ppp1pppp/8/3p4/4P3/8/PPPP1PPP/RNBQKBNR w KQkq - 0 3")
         page.wait_for_timeout(120)
         page.evaluate(PLAY, [36, 27])               # e4xd5
-        page.wait_for_timeout(430)
+        page.wait_for_timeout(800)                  # 비행 0.6초 → 잡힌 기물이 커지는 중
         page.evaluate(FREEZE, 300)
         shot(page, "fx-4-laugh.png")
         page.evaluate(THAW)
@@ -145,7 +145,7 @@ def main():
         page.evaluate(SET, "rnbqkbnr/ppp1pppp/8/3p4/4P3/8/PPPP1PPP/RNBQKBNR b KQkq - 0 3")
         page.wait_for_timeout(120)
         page.evaluate(PLAY, [27, 36])               # d5xe4 (흑)
-        page.wait_for_timeout(430)
+        page.wait_for_timeout(800)                  # 비행 0.6초 → 잡힌 기물이 커지는 중
         page.evaluate(FREEZE, 300)
         shot(page, "fx-5-cry.png")
         page.evaluate(THAW)
@@ -158,7 +158,7 @@ def main():
         page.wait_for_timeout(120)
         for f, t in [(49, 40), (42, 51), (53, 44), (38, 47), (44, 35), (47, 54)]:
             page.evaluate(PLAY, [f, t])
-            page.wait_for_timeout(420)
+            page.wait_for_timeout(900)
         page.wait_for_timeout(700)                  # 마지막 연출이 끝나기를 기다린다
         print("  history:", page.evaluate("() => JSON.stringify(window.__cuteChess.rules.history())"))
         print("  taken:", page.evaluate("() => JSON.stringify(window.__cuteChess.state.taken)"))

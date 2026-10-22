@@ -554,14 +554,14 @@ html[data-theme="dark"] .piece.b { --body: #3a3634; --line: #9b948c; --mane: rgb
 .fly-piece {
   z-index: 3;
   filter: drop-shadow(0 9px 7px rgba(0, 0, 0, .3));
-  animation: flySlide 330ms cubic-bezier(.22, .9, .3, 1) forwards;
+  animation: flySlide 600ms cubic-bezier(.4, .05, .3, 1) forwards;
 }
-.fly-piece.rook { animation-duration: 290ms; }
-.fly-piece.knight { animation: flyArc 430ms cubic-bezier(.22, .9, .3, 1) forwards; }
+.fly-piece.rook { animation-duration: 540ms; }
+.fly-piece.knight { animation: flyArc 760ms cubic-bezier(.4, .05, .3, 1) forwards; }
 
 @keyframes flySlide {
   0%   { transform: translate(0, 0) scale(1); }
-  32%  { transform: translate(calc(var(--dx) * .32), calc(var(--dy) * .32)) scale(1.1); }
+  30%  { transform: translate(calc(var(--dx) * .3), calc(var(--dy) * .3)) scale(1.12); }
   100% { transform: translate(var(--dx), var(--dy)) scale(1); }
 }
 /* 나이트는 살짝 뛰어넘는다 (귀여운 포물선) */
@@ -571,17 +571,21 @@ html[data-theme="dark"] .piece.b { --body: #3a3634; --line: #9b948c; --mane: rgb
   100% { transform: translate(var(--dx), var(--dy)) scale(1) rotate(0); }
 }
 
-/* ---- 잡힌 기물 : 얼굴이 바뀐 채로 둥실 떠올라 사라진다 ---- */
+/* ---- 잡힌 기물 : 그 자리에서 커지며 표정을 보여주고 → 정상 크기로 돌아온 뒤 사라진다 ---- */
 .victim {
   z-index: 4;
-  animation: victimFly 900ms cubic-bezier(.3, .7, .4, 1) forwards;
+  transform-origin: 50% 55%;
+  filter: drop-shadow(0 10px 9px rgba(40, 30, 60, .3));
+  animation: victimGrow 1400ms cubic-bezier(.3, .8, .4, 1) forwards;
 }
-@keyframes victimFly {
-  0%   { transform: translate(0, 0) scale(1) rotate(0); opacity: 1; }
-  12%  { transform: translate(0, -6%) scale(1.24) rotate(-8deg); opacity: 1; }
-  34%  { transform: translate(4%, -72%) scale(1.1) rotate(7deg); opacity: 1; }
-  70%  { transform: translate(-5%, -124%) scale(.95) rotate(-9deg); opacity: .9; }
-  100% { transform: translate(2%, -180%) scale(.55) rotate(11deg); opacity: 0; }
+@keyframes victimGrow {
+  0%   { transform: scale(1) rotate(0); opacity: 1; }
+  16%  { transform: scale(1.58) rotate(-5deg); opacity: 1; }   /* 커지면서 */
+  34%  { transform: scale(1.62) rotate(4deg); opacity: 1; }    /* 표정 보여주기 */
+  56%  { transform: scale(1.5) rotate(-3deg); opacity: 1; }    /* 잠깐 유지 */
+  78%  { transform: scale(1.02) rotate(0); opacity: 1; }       /* 다시 정상 크기로 */
+  92%  { transform: scale(1) rotate(0); opacity: 1; }
+  100% { transform: scale(.86) rotate(0); opacity: 0; }        /* 그다음 사라짐 */
 }
 
 /* ---- 도착 : 위치 확인 링 + 도장 + 말랑 착지 ---- */
@@ -600,8 +604,8 @@ html[data-theme="dark"] .piece.b { --body: #3a3634; --line: #9b948c; --mane: rgb
   100% { transform: scale(1.5); opacity: 0; }
 }
 
-/* "여기 도착!" 확인 도장 : 칸 오른쪽 위에 톡 찍힌다
-   (연출 레이어(z 30)보다 위 → 잡힌 기물이 떠올라도 도장이 가려지지 않는다) */
+/* "여기 도착!" 확인 도장 : 칸 오른쪽 아래에 톡 찍힌다
+   (잡기에서는 잡힌 기물이 커지며 표정을 보여주므로 도장은 생략한다) */
 .land-stamp {
   position: absolute;
   right: -7%;

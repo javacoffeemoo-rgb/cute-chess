@@ -594,10 +594,24 @@ FX_TESTS = r"""
     C.play(f, t, p);
     C.state.thinking = false;
   };
+  // 연출은 타이머로 움직인다 → 고정 시간 대신 "조건이 될 때까지" 기다린다 (느린 기기에서도 안전)
+  const until = async (cond, ms) => {
+    const t0 = Date.now();
+    while (Date.now() - t0 < (ms || 4000)) { if (cond()) return true; await wait(40); }
+    return false;
+  };
+  const cellW = () => document.querySelector('.square').getBoundingClientRect().width;
+  const victimScale = () => {
+    const el = document.querySelector('.victim');
+    return el ? el.getBoundingClientRect().width / cellW() : 0;
+  };
 
   C.settings.playerColor = 'w';
   C.settings.level = 3;
   C.profile.nickname = '폰돌이';
+  // 대국 화면을 실제로 띄운다 (크기 측정은 화면에 보일 때만 의미가 있다)
+  document.getElementById('screen-home').classList.remove('active');
+  document.getElementById('screen-game').classList.add('active');
 
   /* ── 이동 연출 ───────────────────────────────────────────── */
   C.newGame(); C.render();
@@ -605,35 +619,42 @@ FX_TESTS = r"""
   ok('이동 연출 : 날아가는 기물이 생긴다', q('.fly-piece') === 1, q('.fly-piece') + '개');
   ok('이동 : 도착 칸 기물은 도착 전까지 숨김', opacityAt(36) === '0', 'opacity=' + opacityAt(36));
   const dur = parseFloat(getComputedStyle(document.querySelector('.fly-piece')).animationDuration);
-  ok('이동이 천천히 (0.3초 이상)', dur >= 0.3 && dur <= 1.2, dur + 's');
+  ok('이동이 천천히 (0.5초 이상)', dur >= 0.5 && dur <= 1.5, dur + 's');
 
-  await wait(520);                                // 비행(0.33초) + 도착
+  await until(() => q('.land-stamp') === 1, 3000);   // 비행(0.6초) 끝 → 도착
   ok('도착 : 위치 확인 도장이 찍힌다', q('.land-stamp') === 1, q('.land-stamp') + '개');
   ok('도착 : 기물이 다시 보인다', opacityAt(36) === '1', 'opacity=' + opacityAt(36));
-  await wait(1400);
+  await until(() => q('.fly-piece, .land-stamp, .land-ring') === 0, 4000);
   ok('연출은 잠시 뒤 스스로 사라진다', q('.fly-piece, .land-stamp, .land-ring') === 0,
      q('.fly-piece, .land-stamp, .land-ring') + '개 남음');
 
   /* ── 표정 : 잡힌 기물 ─────────────────────────────────────── */
   C.rules.load('rnbqkbnr/ppp1pppp/8/3p4/4P3/8/PPPP1PPP/RNBQKBNR w KQkq - 0 3'); C.render();
   play(36, 27);                                   // 내가 흑 폰을 잡는다 (exd5)
-  await wait(440);
+  await until(() => q('.victim') === 1, 3000);
   ok('내가 AI 기물을 잡으면 : 잡힌 기물이 웃는다', q('.victim svg.laugh') === 1, q('.victim svg.laugh') + '개');
+  ok('잡기에서는 도장 대신 큰 표정을 보여준다', q('.land-stamp') === 0, q('.land-stamp') + '개');
+  await until(() => victimScale() >= 1.4, 2000);
+  ok('잡힌 기물이 커진다 (1.4배 이상)', victimScale() >= 1.4, '×' + victimScale().toFixed(2));
   ok('내 쪽 표시줄에 웃는 얼굴로 남는다', q('#taken-me .tk svg.laugh') === 1, q('#taken-me .tk') + '개');
+  await until(() => q('.victim') === 0, 4000);
+  ok('표정 연출은 끝나면 정상으로 돌아온다 (보드에 흔적 없음)',
+     q('.victim') === 0 && q('.square svg.laugh, .square svg.cry') === 0,
+     q('.victim') + '개 남음');
 
   C.rules.load('rnbqkbnr/ppp1pppp/8/3p4/4P3/8/PPPP1PPP/RNBQKBNR w KQkq - 0 3'); C.render();
   play(48, 40);                                   // 백 : a2 → a3 (잡기 아님)
   play(27, 36);                                   // 흑(AI) : d5xe4 → 내 폰이 잡힌다
-  await wait(440);
+  await until(() => q('.victim') === 1, 3000);
   ok('내 기물이 잡히면 : 잡힌 기물이 운다', q('.victim svg.cry') === 1, q('.victim svg.cry') + '개');
   ok('AI 쪽 표시줄에 우는 얼굴로 남는다', q('#taken-opp .tk svg.cry') === 1, q('#taken-opp .tk') + '개');
-  ok('얼굴은 원래 기물로 돌아온다 (보드에는 표정 없음)', q('.square svg.laugh, .square svg.cry') === 0);
+  await until(() => q('.victim') === 0, 4000);
 
   /* ── 캐슬링 : 킹 + 룩 ─────────────────────────────────────── */
   C.rules.load('r3k2r/8/8/8/8/8/8/R3K2R w KQkq - 0 1'); C.render();
   play(60, 62);                                   // O-O
   ok('캐슬링 : 킹과 룩이 함께 날아간다', q('.fly-piece') === 2, q('.fly-piece') + '개');
-  await wait(600);
+  await until(() => q('.fly-piece') === 0, 3000);
 
   /* ── 잡힌 기물 목록 (3:3) ─────────────────────────────────── */
   C.rules.load('7k/8/8/8/3p2p1/p1p1p2P/1P1P1PP1/K7 w - - 0 1'); C.render();

@@ -562,7 +562,8 @@ gh api -X POST repos/<사용자>/<저장소>/pages -f "source[branch]=main" -f "
 ```powershell
 python dev/verify_deploy.py https://<주소>/
 ```
-정적 파일 · 매니페스트·아이콘 · 서비스 워커(등록·범위·캐시 11개) · Worker AI · **이동 연출·도착 도장** · **오프라인 새로고침** · 콘솔 오류 0 → **17개 전부 통과** (2026-10-22, `cute-chess-v1.4`)
+정적 파일 · 매니페스트·아이콘 · 서비스 워커(캐시 11개) · Worker AI · **이동 연출·도착 도장** · **오프라인 새로고침** · 콘솔 오류 0 → **16개 전부 통과** (2026-10-22, `cute-chess-v1.4`)
+로컬 사본(`python dev/verify_deploy.py http://127.0.0.1:8123/dist/`)에서는 서비스 워커 **범위** 검사가 더해져 **17개**입니다.
 GitHub Pages 는 `.js` 를 `application/javascript` 로 보내서 **Web Worker 도 정상**입니다.
 
 ⚠️ 알아둘 것

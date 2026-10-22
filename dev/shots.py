@@ -53,7 +53,7 @@ def main():
     notes = []
     with sync_playwright() as p:
         browser = p.chromium.launch()
-        page = browser.new_page(viewport=PHONE, device_scale_factor=2)
+        page = browser.new_page(viewport=PHONE, device_scale_factor=2, reduced_motion="reduce")
         page.goto(BASE)
         page.wait_for_timeout(300)
         page.screenshot(path=str(OUT / "shot-1-home.png"))
@@ -144,7 +144,7 @@ def main():
         page.close()
 
         # ---- 가로 화면 ----
-        land = browser.new_page(viewport=LAND, device_scale_factor=2)
+        land = browser.new_page(viewport=LAND, device_scale_factor=2, reduced_motion="reduce")
         land.goto(BASE)
         land.evaluate(ENTER_GAME, {"level": 4})
         land.evaluate("() => window.__cuteChess.play(52, 36)")

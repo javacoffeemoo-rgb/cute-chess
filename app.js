@@ -82,6 +82,8 @@
     danger: [],              // 위험한 칸 index 목록
     thinking: false,         // AI가 생각하는 중 (입력 잠금)
     aiInfo: null,            // 마지막 AI 탐색 정보 {depth, nodes, ms}
+    taken: { w: [], b: [] }, // 잡힌 기물 목록 (6주차 : 얼굴 반응에 쓴다)
+    animHide: [],            // 이동 연출 중 숨길 칸 (도착 칸 · 캐슬링 룩 칸)
     clock: 0,
     timerId: null,
   };
@@ -136,6 +138,8 @@
   const resumeInfo  = $('resume-info');
   const installBtn  = $('btn-install');
   const netNote     = $('net-note');
+  const takenMeEl   = $('taken-me');
+  const takenOppEl  = $('taken-opp');
 
   function showModal(id) { $(id).classList.add('show'); }
   function hideModal(id) { $(id).classList.remove('show'); }
@@ -146,6 +150,7 @@
      ========================================================== */
   function newGame() {
     AI.cancel();                       // 이전 판의 "생각 중" 응답은 버린다
+    FX.clear();                        // 진행 중이던 이동 연출도 정리
     clearSession();                    // 새 판을 시작하면 저장된 대국은 무효 (4주차)
     state.rules.reset();
     state.selected = null;
@@ -172,6 +177,16 @@
     const hist = state.rules.history({ verbose: true });
     const last = hist[hist.length - 1];
     state.lastMove = last ? { from: sqIndex(last.from), to: sqIndex(last.to) } : null;
+
+    // 잡힌 기물 (6주차) : 몇 번째 수인지로 둔 쪽을 알 수 있다 (백이 먼저 두므로 짝/홀)
+    const taken = { w: [], b: [] };
+    for (let i = 0; i < hist.length; i++) {
+      const h = hist[i];
+      if (!h.captured) continue;
+      const mover = (i % 2 === 0) ? 'w' : 'b';
+      taken[mover].push({ type: h.captured, color: mover === 'w' ? 'b' : 'w' });
+    }
+    state.taken = taken;
   }
 
   /* ==========================================================
@@ -256,6 +271,7 @@
       html += '</div>';
     }
     boardEl.innerHTML = html;
+    FX.sync();                       // 연출 레이어 다시 붙이기 + 날아가는 중인 칸 숨김 유지
 
     state.popSquare = null;          // "뿅" 애니메이션은 한 번만
 
@@ -268,6 +284,18 @@
     $('btn-hint').disabled = busy;
   }
 
+  // 잡힌 기물 표시 (6주차) : 값이 큰 기물부터, 너무 많으면 +n
+  const TAKEN_VALUE = { q: 5, r: 4, b: 3, n: 2, p: 1 };
+  function takenHTML(list, mood) {
+    if (!list || !list.length) return '';
+    const sorted = list.slice().sort((a, b) => TAKEN_VALUE[b.type] - TAKEN_VALUE[a.type]);
+    const MAX = 6;
+    let html = sorted.slice(0, MAX)
+      .map(p => `<span class="tk">${pieceHTML(p.type, p.color, mood)}</span>`).join('');
+    if (sorted.length > MAX) html += `<span class="tk-more">+${sorted.length - MAX}</span>`;
+    return html;
+  }
+
   function renderPlayers() {
     const nick = profile.nickname || '나';
     const me = myColor();
@@ -276,6 +304,10 @@
     meNameEl.textContent = nick;
     oppNameEl.textContent = `AI Lv.${settings.level}`;
     gameTitleEl.textContent = `AI 대전 · Lv.${settings.level} ${LEVEL_NAME[settings.level]}`;
+
+    // 잡은 기물 (6주차) : 내가 잡은 AI 기물은 웃고, AI 가 잡은 내 기물은 운다
+    takenMeEl.innerHTML = takenHTML(state.taken[myColor()], 'laugh');
+    takenOppEl.innerHTML = takenHTML(state.taken[aiColor()], 'cry');
 
     // 상대 : 생각 중이면 뱃지가 바뀐다
     oppBadgeEl.textContent = state.thinking
@@ -335,6 +367,176 @@
   }
 
   /* ==========================================================
+     8-B. 이동 연출 · 기물 표정 (6주차)
+       · 규칙(상태)은 applyMove 에서 이미 바뀐다 → 연출은 "화면 위에서만" 한다
+         (그래서 저장·테스트·되돌리기는 예전처럼 즉시 동기로 돈다)
+       · 이동 : 기물이 천천히 미끄러진다 (나이트는 살짝 포물선)
+       · 도착 : 위치 확인 도장(체크) + 링 + 말랑 착지
+       · 잡힘 : 잡힌 기물의 얼굴이 바뀐다
+            AI 기물이 잡히면 → 웃음(ㅋㅋ)   /   내 기물이 잡히면 → 울음(엉엉)
+       · prefers-reduced-motion 이면 움직임 없이 바로 반영한다
+     ========================================================== */
+  const FX = (function () {
+    const layer = document.createElement('div');
+    layer.className = 'anim-layer';
+
+    const mq = window.matchMedia ? window.matchMedia('(prefers-reduced-motion: reduce)') : null;
+    const reduced = () => !!(mq && mq.matches);
+
+    // 도착 확인 도장 : 체크 + 반짝이 (파스텔)
+    const STAMP =
+      '<svg viewBox="0 0 44 44" aria-hidden="true">' +
+      '<circle cx="18.5" cy="23.5" r="13.5" fill="#fffdfa" stroke="var(--primary)" stroke-width="3.2"/>' +
+      '<path d="M12.2 23.8 l4.6 4.9 8.9 -9.7" fill="none" stroke="var(--primary)" ' +
+      'stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round"/>' +
+      '<path d="M35.5 4.7 l1.7 4.4 4.4 1.7 -4.4 1.7 -1.7 4.4 -1.7 -4.4 -4.4 -1.7 4.4 -1.7 Z" ' +
+      'fill="var(--primary)" opacity=".95"/>' +
+      '</svg>';
+
+    let gen = 0;         // 연출 세대 — 새 수가 들어오면 이전 연출의 콜백을 버린다
+
+    // 64칸 index → 보드 위 표시 위치 (뒤집기 반영)
+    function cellOf(i) {
+      const p = state.flipped ? 63 - i : i;
+      return { col: p & 7, row: p >> 3 };
+    }
+
+    function make(kind, i, inner) {
+      const el = document.createElement('div');
+      el.className = kind;
+      const c = cellOf(i);
+      el.style.left = (c.col * 12.5) + '%';
+      el.style.top = (c.row * 12.5) + '%';
+      el.innerHTML = inner;
+      layer.appendChild(el);
+      return el;
+    }
+
+    function pieceAt(i) {
+      return boardEl.querySelector(`.square[data-i="${i}"] .piece`);
+    }
+
+    // 숨겨 둔 목적지 기물을 다시 보이게
+    function reveal() {
+      for (const i of state.animHide) {
+        const el = pieceAt(i);
+        if (el) el.style.opacity = '';
+      }
+      state.animHide = [];
+    }
+
+    // 렌더링으로 보드가 다시 그려질 때마다 : 레이어를 다시 붙이고 숨김을 유지
+    function sync() {
+      boardEl.appendChild(layer);
+      for (const i of state.animHide) {
+        const el = pieceAt(i);
+        if (el) el.style.opacity = '0';
+      }
+    }
+
+    function clear() {
+      gen++;
+      layer.innerHTML = '';
+      reveal();
+      boardEl.querySelectorAll('.land-ring, .land-stamp').forEach(el => el.remove());
+      boardEl.querySelectorAll('.piece.land').forEach(el => el.classList.remove('land'));
+    }
+
+    // 도착 연출 : 링 + 확인 도장 + 말랑 착지
+    function land(i) {
+      const cell = boardEl.querySelector(`.square[data-i="${i}"]`);
+      if (!cell) return;
+      const ring = document.createElement('span');
+      ring.className = 'land-ring';
+      const stamp = document.createElement('span');
+      stamp.className = 'land-stamp';
+      stamp.innerHTML = STAMP;
+      cell.appendChild(ring);
+      cell.appendChild(stamp);
+
+      const p = cell.querySelector('.piece');
+      if (p) {
+        p.classList.remove('land');
+        void p.offsetWidth;                   // 애니메이션 재시작
+        p.classList.add('land');
+      }
+      setTimeout(() => {
+        ring.remove();
+        stamp.remove();
+        if (p) p.classList.remove('land');
+      }, 1150);
+    }
+
+    // 잡힌 기물 : 얼굴 바꿔서 둥실 떠오르며 사라진다
+    function victimFx(piece, sq) {
+      const mood = (piece.color === aiColor()) ? 'laugh' : 'cry';
+      const el = make('victim', sq, pieceHTML(piece.type, piece.color, mood));
+      setTimeout(() => el.remove(), 980);
+    }
+
+    /**
+     * 이동 연출
+     * @param {Array} before 이동 전 64칸 배치 (rules.move 전에 복사해 둔 것)
+     * @param {Object} info   rules.move() 결과
+     */
+    function move(before, info, from, to) {
+      clear();
+      if (reduced()) return;                    // 움직임 없이 바로 (상태는 이미 반영됨)
+      const piece = before[from];
+      if (!piece) return;
+
+      const my = gen;
+      const isKnight = piece.type === 'n';
+      const dur = isKnight ? 430 : 330;         // 천천히 (기본 0.33초)
+
+      // 도착 칸(과 캐슬링 룩 칸)의 기물은 날아가는 동안 숨긴다 — 두 개가 겹쳐 보이지 않게
+      const hides = [to];
+      let rook = null;
+      if (info.isCastle) {
+        const rank = to & ~7;
+        const kingside = (to & 7) > (from & 7);
+        const rFrom = rank + (kingside ? 7 : 0);
+        const rTo = rank + (kingside ? 5 : 3);
+        if (before[rFrom]) { rook = { from: rFrom, to: rTo, piece: before[rFrom] }; hides.push(rTo); }
+      }
+      state.animHide = hides;
+      for (const i of hides) {
+        const el = pieceAt(i);
+        if (el) el.style.opacity = '0';
+      }
+
+      // 날아가는 기물 (프로모션이면 폰으로 날아가 도착할 때 승격된 모습으로 바뀐다)
+      const fly = make('fly-piece' + (isKnight ? ' knight' : ''), from,
+        pieceHTML(piece.type, piece.color));
+      fly.style.setProperty('--dx', ((to & 7) - (from & 7)) * 100 + '%');
+      fly.style.setProperty('--dy', ((to >> 3) - (from >> 3)) * 100 + '%');
+
+      let flyRook = null;
+      if (rook) {
+        flyRook = make('fly-piece rook', rook.from, pieceHTML(rook.piece.type, rook.piece.color));
+        flyRook.style.setProperty('--dx', ((rook.to & 7) - (rook.from & 7)) * 100 + '%');
+        flyRook.style.setProperty('--dy', ((rook.to >> 3) - (rook.from >> 3)) * 100 + '%');
+      }
+
+      // 잡힌 기물 : 앙파상은 도착 칸이 아니라 옆 칸에서 잡힌다
+      const capSq = info.isEp ? to + (piece.color === 'w' ? 8 : -8)
+        : (info.captured ? to : -1);
+      const victim = capSq >= 0 ? before[capSq] : null;
+
+      setTimeout(() => {
+        if (my !== gen) return;
+        fly.remove();
+        if (flyRook) flyRook.remove();
+        reveal();
+        land(to);
+        if (victim) victimFx(victim, capSq);
+      }, dur + 10);
+    }
+
+    return { move: move, sync: sync, clear: clear, reduced: reduced };
+  })();
+
+  /* ==========================================================
      9. 이동 실행
      ========================================================== */
   function vibrate(ms) {
@@ -359,6 +561,7 @@
   }
 
   function applyMove(from, to, promotion) {
+    const before = state.board.slice();        // 연출용 : 이동 전 배치 (rules.move 전에 복사)
     const info = state.rules.move({ from: from, to: to, promotion: promotion });
     if (!info) return;
 
@@ -384,6 +587,7 @@
     }
 
     render();
+    FX.move(before, info, from, to);             // 6주차 : 천천히 이동 · 도착 확인 · 표정 반응
     if (res) {
       clearSession();                            // 끝난 대국은 이어할 필요가 없다
       SOUND.play(res.type === 'checkmate' ? (res.winner === myColor() ? 'win' : 'lose') : 'draw');
@@ -399,6 +603,7 @@
   function undo() {
     if (!state.rules.history().length) return;
     AI.cancel();                             // 생각 중이던 수는 버린다
+    FX.clear();
     state.thinking = false;
 
     state.rules.undo();
@@ -548,6 +753,9 @@
   }
 
   // AI 차례면 생각을 시작한다
+  const AI_MIN_MS = 520;      // 최소 대기 — 내 기물이 "도착하는 걸 보고" 응수하게 (연출 0.33초 + 여유)
+  const nowMs = () => (window.performance && performance.now) ? performance.now() : Date.now();
+
   function maybeAI() {
     if (!state.started || state.result || state.pending || state.thinking) return;
     if (state.turn !== aiColor()) return;
@@ -557,11 +765,24 @@
     state.hint = null;
     render();                                          // "생각 중…"을 먼저 보여준다
 
-    AI.think(state.rules.fen(), settings.level, (mv, meta) => {
-      state.thinking = false;
+    const fen = state.rules.fen();                     // AI 가 판단한 국면
+    const t0 = nowMs();
+
+    AI.think(fen, settings.level, (mv, meta) => {
       state.aiInfo = meta || null;
-      if (!mv || state.result || !state.started) { render(); return; }
-      applyMove(mv.from, mv.to, mv.promotion);
+      if (!mv || state.result || !state.started) { state.thinking = false; render(); return; }
+
+      // 계산이 빨라도 곧바로 두지 않는다 (내 이동 연출이 잘리지 않게)
+      setTimeout(() => {
+        // 그 사이 새 게임·되돌리기·판 변경이 있었으면 이 응수는 버린다
+        if (!state.thinking || state.result || !state.started || state.rules.fen() !== fen) {
+          state.thinking = false;
+          render();
+          return;
+        }
+        state.thinking = false;
+        applyMove(mv.from, mv.to, mv.promotion);
+      }, Math.max(0, AI_MIN_MS - (nowMs() - t0)));
     });
   }
 
@@ -687,6 +908,7 @@
     if (!s) return false;
 
     AI.cancel();
+    FX.clear();
     state.rules.reset();
     for (const m of s.moves) {
       if (!state.rules.move({ from: m.from, to: m.to, promotion: m.promotion })) {
@@ -1145,5 +1367,7 @@
     clearSession: clearSession,
     syncHomeUI: syncHomeUI,
     get sw() { return swReady; },
+    // 6주차 : 이동 연출 · 표정
+    fx: FX,
   };
 })();

@@ -350,6 +350,7 @@ body {
 }
 
 .board {
+  position: relative;            /* 이동 연출 레이어의 기준 */
   width: min(100%, max(272px, calc(100dvh - 340px)));
   aspect-ratio: 1 / 1;
   display: grid;
@@ -479,6 +480,11 @@ html[data-theme="dark"] .piece.b { --body: #3a3634; --line: #9b948c; --mane: rgb
 .piece .mn { fill: none; stroke: var(--mane); stroke-width: 3.2; stroke-linecap: round; }
 .piece .gm { fill: var(--gem); stroke: var(--line); stroke-width: 2; }
 
+/* 표정 (6주차) : 웃는 입 · 혀 · 눈물 */
+.piece .mo { fill: var(--eye); }
+.piece .tg { fill: #ff8fa6; }
+.piece .tr { fill: #7cc8ff; }
+
 /* ---------- 상태 / 액션 ---------- */
 .status {
   flex: none;
@@ -525,6 +531,121 @@ html[data-theme="dark"] .piece.b { --body: #3a3634; --line: #9b948c; --mane: rgb
 }
 .square.sel .piece { animation: pieceBob .6s ease-in-out infinite; }
 .square.pop .piece { animation: piecePop .3s cubic-bezier(.34, 1.56, .64, 1); }
+
+/* ==========================================================
+   이동 연출 · 표정 (6주차)
+   ========================================================== */
+
+/* 연출 레이어 : 보드 위에 겹쳐 놓고, 날아가는 기물만 그린다 (입력은 통과) */
+.anim-layer {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: 30;
+}
+.anim-layer > * {
+  position: absolute;
+  width: 12.5%;
+  height: 12.5%;
+}
+
+/* ---- 날아가는 기물 : 천천히 미끄러진다 ---- */
+/* --dx / --dy 는 "칸 단위 %" (한 칸 = 100%) — 칸 크기가 바뀌어도 그대로 맞는다 */
+.fly-piece {
+  z-index: 3;
+  filter: drop-shadow(0 9px 7px rgba(0, 0, 0, .3));
+  animation: flySlide 330ms cubic-bezier(.22, .9, .3, 1) forwards;
+}
+.fly-piece.rook { animation-duration: 290ms; }
+.fly-piece.knight { animation: flyArc 430ms cubic-bezier(.22, .9, .3, 1) forwards; }
+
+@keyframes flySlide {
+  0%   { transform: translate(0, 0) scale(1); }
+  32%  { transform: translate(calc(var(--dx) * .32), calc(var(--dy) * .32)) scale(1.1); }
+  100% { transform: translate(var(--dx), var(--dy)) scale(1); }
+}
+/* 나이트는 살짝 뛰어넘는다 (귀여운 포물선) */
+@keyframes flyArc {
+  0%   { transform: translate(0, 0) scale(1) rotate(0); }
+  45%  { transform: translate(calc(var(--dx) * .45), calc(var(--dy) * .45 - 22%)) scale(1.13) rotate(-5deg); }
+  100% { transform: translate(var(--dx), var(--dy)) scale(1) rotate(0); }
+}
+
+/* ---- 잡힌 기물 : 얼굴이 바뀐 채로 둥실 떠올라 사라진다 ---- */
+.victim {
+  z-index: 4;
+  animation: victimFly 900ms cubic-bezier(.3, .7, .4, 1) forwards;
+}
+@keyframes victimFly {
+  0%   { transform: translate(0, 0) scale(1) rotate(0); opacity: 1; }
+  12%  { transform: translate(0, -6%) scale(1.24) rotate(-8deg); opacity: 1; }
+  34%  { transform: translate(4%, -72%) scale(1.1) rotate(7deg); opacity: 1; }
+  70%  { transform: translate(-5%, -124%) scale(.95) rotate(-9deg); opacity: .9; }
+  100% { transform: translate(2%, -180%) scale(.55) rotate(11deg); opacity: 0; }
+}
+
+/* ---- 도착 : 위치 확인 링 + 도장 + 말랑 착지 ---- */
+.land-ring {
+  position: absolute;
+  inset: 7%;
+  border-radius: 50%;
+  border: 3px solid var(--primary);
+  z-index: 12;
+  pointer-events: none;
+  opacity: 0;
+  animation: landRing 560ms ease-out forwards;
+}
+@keyframes landRing {
+  0%   { transform: scale(.5); opacity: .85; }
+  100% { transform: scale(1.5); opacity: 0; }
+}
+
+/* "여기 도착!" 확인 도장 : 칸 오른쪽 위에 톡 찍힌다
+   (연출 레이어(z 30)보다 위 → 잡힌 기물이 떠올라도 도장이 가려지지 않는다) */
+.land-stamp {
+  position: absolute;
+  right: -7%;
+  bottom: -11%;
+  width: 50%;
+  height: 50%;
+  z-index: 40;
+  pointer-events: none;
+  filter: drop-shadow(0 3px 4px rgba(0, 0, 0, .2));
+  animation: stampPop 1050ms cubic-bezier(.3, 1.5, .5, 1) forwards;
+}
+@keyframes stampPop {
+  0%   { transform: scale(.15) rotate(-34deg); opacity: 0; }
+  20%  { transform: scale(1.18) rotate(7deg); opacity: 1; }
+  36%  { transform: scale(1) rotate(0); opacity: 1; }
+  74%  { transform: scale(1) rotate(0); opacity: 1; }
+  100% { transform: translateY(-18%) scale(.9); opacity: 0; }
+}
+
+/* 착지할 때 말랑 (찌그러졌다가 돌아온다) */
+.square .piece.land { animation: pieceLand 280ms cubic-bezier(.3, 1.5, .5, 1); }
+@keyframes pieceLand {
+  0%   { transform: scale(1.16, .84); }
+  55%  { transform: scale(.94, 1.06); }
+  100% { transform: scale(1, 1); }
+}
+
+/* ---- 플레이어 표시 : 잡은 기물 (웃는 / 우는 얼굴) ---- */
+.taken {
+  display: flex;
+  align-items: center;
+  gap: 1px;
+  flex: none;
+}
+.taken .tk { width: 19px; height: 19px; flex: none; opacity: .95; }
+.taken .tk svg { width: 100%; height: 100%; display: block; }
+.taken .tk-more { font-size: 9.5px; font-weight: 800; color: var(--muted); margin-left: 1px; }
+
+/* 움직임을 줄이도록 설정한 사용자 : 연출 생략 */
+@media (prefers-reduced-motion: reduce) {
+  .fly-piece, .victim, .land-ring, .land-stamp, .square .piece.land { animation: none !important; }
+  .land-ring, .land-stamp { display: none; }
+  .victim { opacity: 0; }
+}
 
 /* ---------- 드래그 고스트 ---------- */
 .drag-layer { position: fixed; inset: 0; pointer-events: none; z-index: 60; }

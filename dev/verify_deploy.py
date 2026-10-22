@@ -154,6 +154,11 @@ def run(base):
         squares = page.eval_on_selector_all(".square", "els => els.length")
         check("보드 64칸 렌더", squares == 64, f"{squares}칸")
         page.evaluate("() => window.__cuteChess.play(52, 36)")     # e2 → e4
+        fly = page.evaluate("() => document.querySelectorAll('.fly-piece').length")
+        page.wait_for_timeout(400)                                 # 비행 0.33초 + 도착
+        stamp = page.evaluate("() => document.querySelectorAll('.land-stamp').length")
+        check("이동 연출 · 도착 확인 도장 (6주차)", fly == 1 and stamp == 1,
+              f"비행 {fly}개 · 도장 {stamp}개")
         page.wait_for_function("() => !window.__cuteChess.state.thinking", timeout=20000)
         hist = page.evaluate("() => window.__cuteChess.rules.history().join(' ')")
         mode = page.evaluate("() => window.__cuteChess.ai.mode")

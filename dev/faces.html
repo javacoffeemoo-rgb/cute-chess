@@ -1,0 +1,56 @@
+<!DOCTYPE html>
+<html lang="ko" data-theme="pastel">
+<head>
+<meta charset="utf-8">
+<title>기물 표정 시트</title>
+<link rel="stylesheet" href="../style.css">
+<style>
+  body { background: #f4effa; margin: 0; padding: 16px; font-family: system-ui, sans-serif; }
+  h1 { font-size: 15px; margin: 0 0 4px; color: #4a3a5a; }
+  p.sub { font-size: 11px; color: #8b7f9a; margin: 0 0 12px; }
+  table { border-collapse: separate; border-spacing: 6px; }
+  th { font-size: 10px; color: #7a6e88; font-weight: 700; }
+  .cell { width: 92px; height: 92px; border-radius: 16px; display: grid; place-items: center; }
+  .cell.light { background: #fffdfb; box-shadow: inset 0 0 0 1px #eadfef; }
+  .cell.dark { background: #3a3340; box-shadow: inset 0 0 0 1px #4d4453; }
+  .cell svg { width: 80px; height: 80px; }
+  .small { width: 44px; height: 44px; border-radius: 10px; }
+  .small svg { width: 38px; height: 38px; }
+  .tiny { width: 22px; height: 22px; border-radius: 6px; }
+  .tiny svg { width: 18px; height: 18px; }
+  .row-label { font-size: 11px; font-weight: 800; color: #5c5170; white-space: nowrap; }
+</style>
+</head>
+<body>
+<h1>기물 표정 — 기본 / 웃음(laugh) / 울음(cry)</h1>
+<p class="sub">위 3줄: 흑 기물 · 아래 3줄: 백 기물 · 맨 아래: 실제 게임 크기(칸 40px / 잡힌 기물 18px)</p>
+<div id="grid"></div>
+
+<script src="../pieces.js"></script>
+<script>
+  const { pieceHTML } = window.CutePieces;
+  const PIECES = [['p', '폰'], ['r', '루크'], ['n', '나이트'], ['b', '비숍'], ['q', '퀸'], ['k', '킹']];
+  const MOODS = [[undefined, '기본'], ['laugh', '웃음'], ['cry', '울음']];
+
+  let html = '<table><tr><th></th>' + MOODS.map(m => `<th>${m[1]}</th>`).join('') + '</tr>';
+  for (const color of ['b', 'w']) {
+    for (const [t, label] of PIECES) {
+      html += `<tr><th class="row-label">${label} ${color === 'w' ? '백' : '흑'}</th>`;
+      for (const [mood, mlabel] of MOODS) {
+        const cls = color === 'w' ? 'light' : 'dark';
+        html += `<td><div class="cell ${cls}" data-mood="${mlabel}">${pieceHTML(t, color, mood)}</div></td>`;
+      }
+      html += '</tr>';
+    }
+  }
+  // 실제 크기
+  html += '<tr><th class="row-label">작게</th>';
+  for (const [mood] of MOODS) {
+    html += `<td><div class="cell light small">${pieceHTML('k', 'w', mood)}</div>`
+         +  `<div class="cell dark tiny" style="margin:6px auto 0">${pieceHTML('k', 'b', mood)}</div></td>`;
+  }
+  html += '</tr></table>';
+  document.getElementById('grid').innerHTML = html;
+</script>
+</body>
+</html>

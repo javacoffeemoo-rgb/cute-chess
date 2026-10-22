@@ -391,11 +391,11 @@ APP_TESTS = r"""
   c.render();
 
   /* 새 게임 20회 (누수 확인) */
-  const nodes0 = $('board').childElementCount;
+  const nodes0 = $('board').querySelectorAll('.square').length;
   const t0 = Date.now();
   for (let i = 0; i < 20; i++) c.newGame();
   c.render();
-  ok('새 게임 20회 후 보드 칸 수 그대로', $('board').childElementCount === nodes0,
+  ok('새 게임 20회 후 보드 칸 수 그대로', $('board').querySelectorAll('.square').length === nodes0,
      nodes0 + '칸');
   ok('새 게임 20회가 1초 안에 끝남', Date.now() - t0 < 1000, (Date.now() - t0) + 'ms');
 
@@ -458,7 +458,7 @@ APP_TESTS = r"""
   c.newGame();
   const f0 = c.state.flipped;
   $('btn-flip').click();
-  ok('판 뒤집기 토글', c.state.flipped === !f0 && $('board').childElementCount === 64);
+  ok('판 뒤집기 토글', c.state.flipped === !f0 && $('board').querySelectorAll('.square').length === 64);
 
   /* 시계 */
   c.newGame();
@@ -575,6 +575,122 @@ SAVE_TESTS = r"""
   return JSON.stringify(R);
 })()
 """
+
+
+FX_TESTS = r"""
+(async () => {
+  const C = window.__cuteChess, $ = id => document.getElementById(id);
+  const R = [];
+  const ok = (n, pass, info) => R.push({ n: n, pass: !!pass, info: info || '' });
+  const wait = ms => new Promise(r => setTimeout(r, ms));
+  const q = sel => document.querySelectorAll(sel).length;
+  const opacityAt = i => {
+    const el = document.querySelector('.square[data-i="' + i + '"] .piece');
+    return el ? getComputedStyle(el).opacity : '(기물 없음)';
+  };
+  // AI 가 끼어들면 그림이 엉킨다 → 한 수 두는 동안만 잠근다
+  const play = (f, t, p) => {
+    C.state.thinking = true;
+    C.play(f, t, p);
+    C.state.thinking = false;
+  };
+
+  C.settings.playerColor = 'w';
+  C.settings.level = 3;
+  C.profile.nickname = '폰돌이';
+
+  /* ── 이동 연출 ───────────────────────────────────────────── */
+  C.newGame(); C.render();
+  play(52, 36);                                   // e2 → e4
+  ok('이동 연출 : 날아가는 기물이 생긴다', q('.fly-piece') === 1, q('.fly-piece') + '개');
+  ok('이동 : 도착 칸 기물은 도착 전까지 숨김', opacityAt(36) === '0', 'opacity=' + opacityAt(36));
+  const dur = parseFloat(getComputedStyle(document.querySelector('.fly-piece')).animationDuration);
+  ok('이동이 천천히 (0.3초 이상)', dur >= 0.3 && dur <= 1.2, dur + 's');
+
+  await wait(520);                                // 비행(0.33초) + 도착
+  ok('도착 : 위치 확인 도장이 찍힌다', q('.land-stamp') === 1, q('.land-stamp') + '개');
+  ok('도착 : 기물이 다시 보인다', opacityAt(36) === '1', 'opacity=' + opacityAt(36));
+  await wait(1400);
+  ok('연출은 잠시 뒤 스스로 사라진다', q('.fly-piece, .land-stamp, .land-ring') === 0,
+     q('.fly-piece, .land-stamp, .land-ring') + '개 남음');
+
+  /* ── 표정 : 잡힌 기물 ─────────────────────────────────────── */
+  C.rules.load('rnbqkbnr/ppp1pppp/8/3p4/4P3/8/PPPP1PPP/RNBQKBNR w KQkq - 0 3'); C.render();
+  play(36, 27);                                   // 내가 흑 폰을 잡는다 (exd5)
+  await wait(440);
+  ok('내가 AI 기물을 잡으면 : 잡힌 기물이 웃는다', q('.victim svg.laugh') === 1, q('.victim svg.laugh') + '개');
+  ok('내 쪽 표시줄에 웃는 얼굴로 남는다', q('#taken-me .tk svg.laugh') === 1, q('#taken-me .tk') + '개');
+
+  C.rules.load('rnbqkbnr/ppp1pppp/8/3p4/4P3/8/PPPP1PPP/RNBQKBNR w KQkq - 0 3'); C.render();
+  play(48, 40);                                   // 백 : a2 → a3 (잡기 아님)
+  play(27, 36);                                   // 흑(AI) : d5xe4 → 내 폰이 잡힌다
+  await wait(440);
+  ok('내 기물이 잡히면 : 잡힌 기물이 운다', q('.victim svg.cry') === 1, q('.victim svg.cry') + '개');
+  ok('AI 쪽 표시줄에 우는 얼굴로 남는다', q('#taken-opp .tk svg.cry') === 1, q('#taken-opp .tk') + '개');
+  ok('얼굴은 원래 기물로 돌아온다 (보드에는 표정 없음)', q('.square svg.laugh, .square svg.cry') === 0);
+
+  /* ── 캐슬링 : 킹 + 룩 ─────────────────────────────────────── */
+  C.rules.load('r3k2r/8/8/8/8/8/8/R3K2R w KQkq - 0 1'); C.render();
+  play(60, 62);                                   // O-O
+  ok('캐슬링 : 킹과 룩이 함께 날아간다', q('.fly-piece') === 2, q('.fly-piece') + '개');
+  await wait(600);
+
+  /* ── 잡힌 기물 목록 (3:3) ─────────────────────────────────── */
+  C.rules.load('7k/8/8/8/3p2p1/p1p1p2P/1P1P1PP1/K7 w - - 0 1'); C.render();
+  for (const mv of [[49, 40], [42, 51], [53, 44], [38, 47], [44, 35], [47, 54]]) play(mv[0], mv[1]);
+  ok('잡힌 기물이 표시줄에 그대로 (내 3 : AI 3)',
+     q('#taken-me .tk') === 3 && q('#taken-opp .tk') === 3,
+     q('#taken-me .tk') + ' : ' + q('#taken-opp .tk'));
+  const trayKinds = Array.from(document.querySelectorAll('#taken-me .tk svg'))
+    .map(s => s.getAttribute('class')).join(' ');
+  ok('표시줄 기물도 같은 표정(웃음)으로 그려진다', trayKinds.indexOf('laugh') >= 0, trayKinds);
+
+  /* ── 정리 ─────────────────────────────────────────────────── */
+  C.newGame();
+  ok('새 게임 = 연출 흔적 정리', q('.anim-layer > *') === 0, q('.anim-layer > *') + '개');
+
+  return JSON.stringify(R);
+})()
+"""
+
+
+def section_fx(browser):
+    print("\n[8] 이동 연출 · 기물 표정")
+    ctx = browser.new_context(**dev_kwargs("Pixel 5"))
+    page = ctx.new_page()
+    errs = []
+    page.on("pageerror", lambda e: errs.append(str(e)))
+    page.goto(BASE)
+    page.wait_for_timeout(400)
+    r = json.loads(page.evaluate(FX_TESTS))
+    for x in r:
+        check("8", x["n"], x["pass"], x["info"])
+    check("8", "연출 테스트 중 스크립트 오류 없음", not errs, errs[0] if errs else "")
+    ctx.close()
+
+    # 움직임 줄이기(prefers-reduced-motion) 사용자는 연출을 건너뛴다
+    ctx = browser.new_context(reduced_motion="reduce", **dev_kwargs("Pixel 5"))
+    page = ctx.new_page()
+    page.goto(BASE)
+    page.wait_for_timeout(400)
+    res = page.evaluate("""() => {
+      const C = window.__cuteChess;
+      document.getElementById('screen-home').classList.remove('active');
+      document.getElementById('screen-game').classList.add('active');
+      C.settings.playerColor = 'w'; C.newGame(); C.render();
+      C.state.thinking = true; C.play(52, 36); C.state.thinking = false;
+      const el = document.querySelector('.square[data-i="36"] .piece');
+      return {
+        fly: document.querySelectorAll('.fly-piece, .land-stamp, .victim').length,
+        shown: el ? getComputedStyle(el).opacity : '?',
+        reduced: C.fx.reduced(),
+        moves: C.rules.history(),
+      };
+    }""")
+    check("8", "움직임 줄이기 설정이면 연출 없이 바로 반영",
+          res["reduced"] and res["fly"] == 0 and res["shown"] == "1" and res["moves"] == ["e4"],
+          f"연출 {res['fly']}개 · opacity {res['shown']} · 기보 {res['moves']}")
+    ctx.close()
 
 
 def section_save(browser):
@@ -737,6 +853,7 @@ def main():
         section_engine(browser)
         section_app(browser)
         section_save(browser)
+        section_fx(browser)
         section_pwa(browser)
         section_perf(browser)
         browser.close()
@@ -751,7 +868,8 @@ def main():
         if ok_:
             by[s][0] += 1
     names = {"1": "기기 프로필", "2": "실제 터치", "3": "규칙·AI 엔진",
-             "4": "앱 엣지 케이스", "5": "저장 견고성", "6": "PWA·오프라인", "7": "성능·메모리"}
+             "4": "앱 엣지 케이스", "5": "저장 견고성", "6": "PWA·오프라인", "7": "성능·메모리",
+             "8": "연출·표정"}
     for s in sorted(by):
         print(f"  [{s}] {names[s]:<14} {by[s][0]:>2}/{by[s][1]:>2}")
     print(f"\n전체 {total - len(failed)}/{total} 통과 · {time.time() - t_start:.0f}초")

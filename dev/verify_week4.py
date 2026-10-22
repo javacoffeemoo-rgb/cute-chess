@@ -49,7 +49,7 @@ def check(name, cond, info=""):
 def main():
     with sync_playwright() as p:
         browser = p.chromium.launch()
-        ctx = browser.new_context(viewport=PHONE, device_scale_factor=2)
+        ctx = browser.new_context(viewport=PHONE, device_scale_factor=2, reduced_motion="reduce")
         page = ctx.new_page()
         page.goto(BASE)
         page.wait_for_timeout(400)
